@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { readFile } from 'fs/promises';
 import { isEqual,  set,  uniqWith } from 'lodash';
 import { StatsCompilation } from 'webpack';
@@ -45,7 +46,7 @@ async function main() {
       if (limitToChunk && chunk.files.find(f => f.includes('.js')) && !chunk.files.find(f => f.includes('.js'))?.match(new RegExp(limitToChunk))) {
         continue;
       }
-      console.log(`Searching in chunk: ${chalk.bold(chunk.files[0])}`);
+      console.log(`Searching in chunk: ${chalk.bold(chunk.files[0])}`, chalk.gray(`(regex: ${limitToChunk})`));
     }
   }
 
@@ -84,22 +85,24 @@ async function main() {
       , isEqual);
     }
   }
-  const key = Object.keys(cache).find(key => key.includes(argv.module));
-  if (!cache[key!]) {
-    console.log(`Cannot find any module matching substring '${key}' (out of ${Object.keys(cache).length} available)`)
+  const moduleToTrace = Object.keys(cache).find(key => key.includes(argv.module));
+  if (!cache[moduleToTrace!]) {
+    console.log(`Cannot find any module matching substring '${moduleToTrace}' (out of ${Object.keys(cache).length} available)`)
     process.exit(1);
   }
 
-  console.log('Searching for module', chalk.bold(key));
+  console.log('Searching for module', chalk.bold(moduleToTrace), chalk.gray(`(query: ${argv.module})`));
 
-  if (!key) {
+  if (!moduleToTrace) {
     return;
   }
 
   const tree: any = {};
   const highlightRegex = argv.highlight ? new RegExp(argv.highlight!) : undefined;
   const highlightIfNeeded = (name: string) => {
-    if (highlightRegex?.test(name)) {
+    if (name === moduleToTrace) {
+      return chalk.bold(name);
+    } if (highlightRegex?.test(name)) {
       return chalk.yellowBright(name);
     } else {
       return name;
@@ -119,7 +122,7 @@ async function main() {
 
   const skipModulesRegex = argv.skipModules ? new RegExp(argv.skipModules!) : undefined;
 
-  function resolveMods(key: string, depth: number, source: string[] = [ chalk.bold(key) ]) {
+  function resolveMods(key: string, depth: number, source: string[] = [ key ]) {
     depth--;
     if (depth < 0) {
       return;
@@ -141,8 +144,7 @@ async function main() {
         continue;
       }
 
-
-      const modSource = [ ...source, highlightIfNeeded(mod.name) ];
+      const modSource = [ ...source, mod.name ];
       set(tree, modSource, `${highlightChunkIfNeeded(moduleToChunk[mod.name])}`);
 
       cache[mod.name]
@@ -151,12 +153,12 @@ async function main() {
             return;
           }
 
-          resolveMods(name, depth, [...modSource, highlightIfNeeded(name)]);
+          resolveMods(name, depth, [...modSource, name]);
         });
     }
     return;
   }
-  resolveMods(key, argv.depth);
+  resolveMods(moduleToTrace, argv.depth);
 
   type TreeBranch = {[id: string]: TreeBranch | string };
   const trimTreeBranch = (treeBranch: TreeBranch) => {
@@ -168,20 +170,26 @@ async function main() {
       } else {
         trimTreeBranch(value);
         if (Object.keys(treeBranch[key]).length === 0) {
-          treeBranch[key] = highlightChunkIfNeeded(moduleToChunk[key]);
+          treeBranch[key] = moduleToChunk[key];
         }
       }
     };
   };
 
-  if (trimTreeRegex) {
-    for (let i = 0; i < argv.depth;++i) {
-      console.log('Trim tree');
-      trimTreeBranch(tree);
-    }
+  for (let i = 0; i < argv.depth;++i) {
+    trimTreeBranch(tree);
   }
 
-  console.log(asTree(tree, true, true));
+  const highlightTreeBranch = (treeBranch: TreeBranch) => {
+    return Object.entries(treeBranch).reduce((acc, [key, value]) => {
+      acc[highlightIfNeeded(key)] = typeof value === 'string' ? highlightChunkIfNeeded(value) : highlightTreeBranch(value);
+      return acc;
+    }, {} as TreeBranch);
+  };
+
+  const highlightedTree = highlightTreeBranch(tree);
+
+  console.log(asTree(highlightedTree, true, true));
 }
 
 main();

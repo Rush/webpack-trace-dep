@@ -1,11 +1,12 @@
 {
   "name": "webpack-trace-dep",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Find out why a given file is included in a webpack bundle or a specific chunk",
   "main": "dist/index.js",
   "bin": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "author": "Damian Kaczmarek <damian@codecharm.io>",
   "license": "MIT",
