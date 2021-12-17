@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'fs/promises';
-import { isEqual,  set,  uniqWith } from 'lodash';
+import { set } from 'lodash';
 import { StatsCompilation } from 'webpack';
 import chalk from 'chalk';
 import { asTree } from 'treeify';
@@ -81,10 +81,9 @@ async function main() {
         continue;
       }
 
-      cache[module.name] = uniqWith(
-        module.reasons.map(reason => {
+      cache[module.name] = module.reasons.map(reason => {
           return { name: reason.moduleName!, userRequest: reason.userRequest!, chunkName };
-      }), isEqual).reduce((acc, { name, ...rest }) => {
+      }).reduce((acc, { name, ...rest }) => {
         acc[name] = { name, ...rest };
         return acc;
       }, {} as { [key: string]: Mod });
@@ -180,7 +179,6 @@ async function main() {
       }
     };
   };
-
   for (let i = 0; i <= argv.depth;++i) {
     trimTreeBranch(tree);
   }
@@ -193,9 +191,7 @@ async function main() {
       return acc;
     }, {} as TreeBranch);
   };
-
   const highlightedTree = highlightTreeBranch(tree);
-
   console.log(asTree(highlightedTree, true, true));
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "webpack-trace-dep",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Find out why a given file is included in a webpack bundle or a specific chunk",
   "main": "dist/index.js",
   "bin": "dist/index.js",
