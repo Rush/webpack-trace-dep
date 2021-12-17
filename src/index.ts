@@ -5,7 +5,6 @@ import { StatsCompilation } from 'webpack';
 import chalk from 'chalk';
 import { asTree } from 'treeify';
 import yargs from 'yargs/yargs';
-import { isConstructSignatureDeclaration } from 'typescript';
 
 const argvPromise = yargs(process.argv.slice(2)).command('* <statsFile> <module>', 'Some descirption', args => {
 }).positional('statsFile', {
@@ -23,15 +22,16 @@ const argvPromise = yargs(process.argv.slice(2)).command('* <statsFile> <module>
   highlightChunk: { alias: 'H', description: 'highlight specific chunk patterns', type: 'string' },
   trimTree: { alias: 't', description: 'trim leaves of the tree matching specific pattern', type: 'string' },
   skipModules: { alias: 's', description: 'skip modules from specific chunk', type: 'string' },
+  showRequest: { alias: 'i', description: 'show user request for each import', type: 'boolean' },
 }).argv;
 
 
-type Mod = { name: string, userRequest: string };
+type Mod = { name: string, userRequest: string, chunkName: string };
 
 async function main() {
   const argv = await argvPromise;
   const parsed: StatsCompilation = JSON.parse(await readFile(argv.statsFile, 'utf-8'));
-  const cache: { [id: string]: Mod[] } = {};
+  const cache: { [id: string]: { [key: string]: Mod } } = {};
 
   if (!parsed || !parsed.chunks) {
     return;
@@ -61,9 +61,10 @@ async function main() {
       continue;
     }
 
+    const chunkName = chunk.files.find(f => f.includes('.js')) || chunk.id?.toString()!;;
     for (const module of chunk.modules) {
       if (module.name) {
-        moduleToChunk[module.name] = chunk.files.find(f => f.includes('.js')) || chunk.id?.toString()!;
+        moduleToChunk[module.name] = chunkName;
       }
     }
 
@@ -81,8 +82,12 @@ async function main() {
       }
 
       cache[module.name] = uniqWith(
-        module.reasons.map(reason => ({ name: reason.moduleName!, userRequest: reason.userRequest! }))
-      , isEqual);
+        module.reasons.map(reason => {
+          return { name: reason.moduleName!, userRequest: reason.userRequest!, chunkName };
+      }), isEqual).reduce((acc, { name, ...rest }) => {
+        acc[name] = { name, ...rest };
+        return acc;
+      }, {} as { [key: string]: Mod });
     }
   }
   const moduleToTrace = Object.keys(cache).find(key => key.includes(argv.module));
@@ -133,7 +138,7 @@ async function main() {
       return;
     }
 
-    for (const mod of mods) {
+    for (const mod of Object.values(mods)) {
       if (!cache[mod.name]) {
         continue;
       }
@@ -145,9 +150,9 @@ async function main() {
       }
 
       const modSource = [ ...source, mod.name ];
-      set(tree, modSource, `${highlightChunkIfNeeded(moduleToChunk[mod.name])}`);
+      set(tree, modSource, `${moduleToChunk[mod.name]}`);
 
-      cache[mod.name]
+      Object.values(cache[mod.name])
         .forEach(({ name }) => {
           if (source.includes(name)) {
             return;
@@ -176,13 +181,15 @@ async function main() {
     };
   };
 
-  for (let i = 0; i < argv.depth;++i) {
+  for (let i = 0; i <= argv.depth;++i) {
     trimTreeBranch(tree);
   }
 
-  const highlightTreeBranch = (treeBranch: TreeBranch) => {
+  const highlightTreeBranch = (treeBranch: TreeBranch, parentName?: string) => {
     return Object.entries(treeBranch).reduce((acc, [key, value]) => {
-      acc[highlightIfNeeded(key)] = typeof value === 'string' ? highlightChunkIfNeeded(value) : highlightTreeBranch(value);
+      const chunkKeyDecoration = (typeof value === 'string' || !parentName) ? '' : `: ${highlightChunkIfNeeded(cache[parentName][key].chunkName)}`;
+      const decoratedKey = `${highlightIfNeeded(key)}${(parentName && argv.showRequest) ? `: ${chalk.gray(cache[parentName][key].userRequest)}` : ''}${chunkKeyDecoration}`;
+      acc[decoratedKey] = typeof value === 'string' ? highlightChunkIfNeeded(value) : highlightTreeBranch(value, key);
       return acc;
     }, {} as TreeBranch);
   };
