@@ -4,7 +4,7 @@
   "description": "Find out why a given file is included in a webpack bundle or a specific chunk",
   "main": "dist/index.js",
   "bin": {
-    "webpack-trace-dep": "./dist/index.js"
+    "webpack-trace-dep": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
