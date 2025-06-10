@@ -233,6 +233,7 @@ yargs(process.argv.slice(2))
         chunk: { alias: 'c', description: 'limit to a specific chunk or chunks (regex)', type: 'string', demandOption: false },
         depth: { alias: 'd', description: 'how deep to look in the chain', type: 'number', demandOption: true },
         skipAsync: { alias: 'a', description: 'Skip async (import()) dependencies', type: 'boolean' },
+        failOnSuccess: { alias: 'f', description: 'Throw non-zero code when chains are found', type: 'boolean' },
       }),
     async argv => {
       const parsed: StatsCompilation = JSON.parse(await readFile(argv.statsFile, 'utf-8'));
