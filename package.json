@@ -1,9 +1,11 @@
 {
   "name": "webpack-trace-dep",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Find out why a given file is included in a webpack bundle or a specific chunk",
   "main": "dist/index.js",
-  "bin": "dist/index.js",
+  "bin": {
+    "webpack-trace-dep": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
